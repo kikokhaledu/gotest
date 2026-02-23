@@ -1,8 +1,9 @@
-.PHONY: help install install-go install-node install-react run-go run-node run-react test-go test-node test-react test-all test-go-cover vet-go prepush reset up-db down-db db-logs psql docker-build up down logs logs-follow logs-all logs-errors ps
+.PHONY: help ensure-env install install-go install-node install-react run-go run-node run-react test-go test-node test-react test-all test-go-cover vet-go prepush reset up-db down-db db-logs psql docker-build up down logs logs-follow logs-all logs-errors ps
 
 help:
 	@echo Available commands:
 	@echo   make help          Show available commands and descriptions
+	@echo   make ensure-env    Create .env from .env.example if missing
 	@echo   make install       Install dependencies for Go, Node backend, and React frontend
 	@echo   make install-go    Run go mod tidy in go-backend
 	@echo   make install-node  Run npm install in node-backend
@@ -32,6 +33,28 @@ help:
 	@echo   make ps            Show docker compose service status
 
 install: install-go install-node install-react
+
+ifeq ($(OS),Windows_NT)
+ensure-env:
+	@if not exist .env ( \
+		if exist .env.example ( \
+			copy /Y .env.example .env >NUL && echo Created .env from .env.example \
+		) else ( \
+			echo ERROR: .env is missing and .env.example was not found. && exit /b 1 \
+		) \
+	)
+else
+ensure-env:
+	@if [ ! -f .env ]; then \
+		if [ -f .env.example ]; then \
+			cp .env.example .env; \
+			echo "Created .env from .env.example"; \
+		else \
+			echo "ERROR: .env is missing and .env.example was not found."; \
+			exit 1; \
+		fi; \
+	fi
+endif
 
 install-go:
 	cd go-backend && go mod tidy
@@ -78,7 +101,7 @@ reset:
 	docker compose down --volumes --remove-orphans
 	$(MAKE) install
 
-up-db:
+up-db: ensure-env
 	docker compose up -d postgres
 
 down-db:
@@ -90,10 +113,10 @@ db-logs:
 psql:
 	docker compose exec postgres psql -U "$${POSTGRES_USER:-gotest}" -d "$${POSTGRES_DB:-gotest}"
 
-docker-build:
+docker-build: ensure-env
 	docker compose build
 
-up:
+up: ensure-env
 	docker compose up --build -d
 
 down:
