@@ -1,0 +1,26 @@
+{
+  "name": "express-backend",
+  "version": "1.0.0",
+  "description": "Express.js backend proxy for Go API",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "node scripts/run-tests.js"
+  },
+  "keywords": [
+    "express",
+    "api",
+    "proxy"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "swagger-ui-express": "^5.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}

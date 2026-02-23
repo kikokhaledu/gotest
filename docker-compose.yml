@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gotest-postgres
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB:?POSTGRES_DB is required}"
+      POSTGRES_USER: "${POSTGRES_USER:?POSTGRES_USER is required}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:?POSTGRES_USER is required} -d ${POSTGRES_DB:?POSTGRES_DB is required}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  go-backend:
+    build:
+      context: ./go-backend
+      dockerfile: Dockerfile
+    container_name: gotest-go-backend
+    environment:
+      POSTGRES_DSN: "${POSTGRES_DSN:?POSTGRES_DSN is required}"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${GO_BACKEND_PORT:-8080}:8080"
+
+  node-backend:
+    build:
+      context: ./node-backend
+      dockerfile: Dockerfile
+    container_name: gotest-node-backend
+    environment:
+      PORT: "${NODE_BACKEND_PORT:-3000}"
+      GO_BACKEND_URL: "${GO_BACKEND_URL:-http://go-backend:8080}"
+      NODE_ENV: "${NODE_ENV:-production}"
+      GO_REQUEST_TIMEOUT_MS: "${GO_REQUEST_TIMEOUT_MS:-5000}"
+      GO_MAX_RESPONSE_BYTES: "${GO_MAX_RESPONSE_BYTES:-1048576}"
+      SHUTDOWN_TIMEOUT_MS: "${SHUTDOWN_TIMEOUT_MS:-10000}"
+      AUTH_ENABLED: "${AUTH_ENABLED:-true}"
+      AUTH_USERNAME: "${AUTH_USERNAME:-admin}"
+      AUTH_PASSWORD: "${AUTH_PASSWORD:-ChangeMe123@}"
+      AUTH_API_KEY: "${AUTH_API_KEY:-dev-local-api-key}"
+      RATE_LIMIT_ENABLED: "${RATE_LIMIT_ENABLED:-true}"
+      RATE_LIMIT_WINDOW_MS: "${RATE_LIMIT_WINDOW_MS:-60000}"
+      RATE_LIMIT_MAX_REQUESTS: "${RATE_LIMIT_MAX_REQUESTS:-120}"
+      AUTH_RATE_LIMIT_MAX_REQUESTS: "${AUTH_RATE_LIMIT_MAX_REQUESTS:-10}"
+    depends_on:
+      go-backend:
+        condition: service_started
+    ports:
+      - "${NODE_BACKEND_PORT:-3000}:3000"
+
+  react-frontend:
+    build:
+      context: ./react-frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: "${VITE_API_URL:-http://localhost:3000}"
+        VITE_AUTH_USERNAME: "${VITE_AUTH_USERNAME:-admin}"
+        VITE_AUTH_PASSWORD: "${VITE_AUTH_PASSWORD:-ChangeMe123@}"
+        VITE_API_KEY: "${VITE_API_KEY:-dev-local-api-key}"
+    container_name: gotest-react-frontend
+    depends_on:
+      node-backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+
+volumes:
+  postgres-data:
