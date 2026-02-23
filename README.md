@@ -34,7 +34,7 @@ PowerShell equivalent:
 Copy-Item .env.example .env
 ```
 
-Or just run `make up`; the Makefile now auto-creates `.env` from `.env.example` if it is missing.
+Or just run `make up`; the Makefile uses `.env` when present, otherwise it falls back to `.env.example`.
 
 2. Start everything:
 

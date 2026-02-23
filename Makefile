@@ -1,9 +1,21 @@
 .PHONY: help ensure-env install install-go install-node install-react run-go run-node run-react test-go test-node test-react test-all test-go-cover vet-go prepush reset up-db down-db db-logs psql docker-build up down logs logs-follow logs-all logs-errors ps
 
+IS_WINDOWS := $(filter Windows_NT,$(OS))
+
+ifneq ($(wildcard .env),)
+ENV_FILE := .env
+else ifneq ($(wildcard .env.example),)
+ENV_FILE := .env.example
+else
+$(error ERROR: neither .env nor .env.example exists)
+endif
+
+COMPOSE := docker compose --env-file $(ENV_FILE)
+
 help:
 	@echo Available commands:
 	@echo   make help          Show available commands and descriptions
-	@echo   make ensure-env    Create .env from .env.example if missing
+	@echo   make ensure-env    Show which env file compose will use (.env preferred, else .env.example)
 	@echo   make install       Install dependencies for Go, Node backend, and React frontend
 	@echo   make install-go    Run go mod tidy in go-backend
 	@echo   make install-node  Run npm install in node-backend
@@ -34,27 +46,8 @@ help:
 
 install: install-go install-node install-react
 
-ifeq ($(OS),Windows_NT)
 ensure-env:
-	@if not exist .env ( \
-		if exist .env.example ( \
-			copy /Y .env.example .env >NUL && echo Created .env from .env.example \
-		) else ( \
-			echo ERROR: .env is missing and .env.example was not found. && exit /b 1 \
-		) \
-	)
-else
-ensure-env:
-	@if [ ! -f .env ]; then \
-		if [ -f .env.example ]; then \
-			cp .env.example .env; \
-			echo "Created .env from .env.example"; \
-		else \
-			echo "ERROR: .env is missing and .env.example was not found."; \
-			exit 1; \
-		fi; \
-	fi
-endif
+	@echo Using env file: $(ENV_FILE)
 
 install-go:
 	cd go-backend && go mod tidy
@@ -102,46 +95,46 @@ reset:
 	$(MAKE) install
 
 up-db: ensure-env
-	docker compose up -d postgres
+	$(COMPOSE) up -d postgres
 
 down-db:
-	docker compose stop postgres
+	$(COMPOSE) stop postgres
 
 db-logs:
-	docker compose logs -f --tail=200 postgres
+	$(COMPOSE) logs -f --tail=200 postgres
 
 psql:
-	docker compose exec postgres psql -U "$${POSTGRES_USER:-gotest}" -d "$${POSTGRES_DB:-gotest}"
+	$(COMPOSE) exec postgres psql -U "$${POSTGRES_USER:-gotest}" -d "$${POSTGRES_DB:-gotest}"
 
 docker-build: ensure-env
-	docker compose build
+	$(COMPOSE) build
 
 up: ensure-env
-	docker compose up --build -d
+	$(COMPOSE) up --build -d
 
 down:
-	docker compose down
+	$(COMPOSE) down
 
 logs:
-	docker compose logs --tail=200
+	$(COMPOSE) logs --tail=200
 
 logs-follow:
-	docker compose logs -f --tail=200
+	$(COMPOSE) logs -f --tail=200
 
-ifeq ($(OS),Windows_NT)
+ifeq ($(IS_WINDOWS),Windows_NT)
 logs-errors:
-	@where rg >NUL 2>&1 && (docker compose logs -f --tail=200 2>&1 | rg --line-buffered -i "(\\berror\\b|\\bfatal\\b|\\bpanic\\b|exception|\\bfailed\\b|timeout|denied|refused|unavailable|status=4[0-9]{2}|status=5[0-9]{2})") || (docker compose logs -f --tail=200 2>&1 | findstr /I /R "error fatal panic exception failed timeout denied refused unavailable status=4[0-9][0-9] status=5[0-9][0-9]")
+	@$(COMPOSE) logs -f --tail=200 2>&1 | findstr /I /R "error fatal panic exception failed timeout denied refused unavailable status=4[0-9][0-9] status=5[0-9][0-9]"
 else
 logs-errors:
 	@if command -v rg >/dev/null 2>&1; then \
-		docker compose logs -f --tail=200 2>&1 | rg -i "(\\berror\\b|\\bfatal\\b|\\bpanic\\b|exception|\\bfailed\\b|timeout|denied|refused|unavailable|status=4[0-9]{2}|status=5[0-9]{2})"; \
+		$(COMPOSE) logs -f --tail=200 2>&1 | rg -i "(\\berror\\b|\\bfatal\\b|\\bpanic\\b|exception|\\bfailed\\b|timeout|denied|refused|unavailable|status=4[0-9]{2}|status=5[0-9]{2})"; \
 	else \
-		docker compose logs -f --tail=200 2>&1 | grep -Ei "(error|fatal|panic|exception|failed|timeout|denied|refused|unavailable|status=4[0-9]{2}|status=5[0-9]{2})"; \
+		$(COMPOSE) logs -f --tail=200 2>&1 | grep -Ei "(error|fatal|panic|exception|failed|timeout|denied|refused|unavailable|status=4[0-9]{2}|status=5[0-9]{2})"; \
 	fi
 endif
 
 logs-all:
-	docker compose logs -f --tail=200
+	$(COMPOSE) logs -f --tail=200
 
 ps:
-	docker compose ps
+	$(COMPOSE) ps
